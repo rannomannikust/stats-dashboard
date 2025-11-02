@@ -1,0 +1,39 @@
+*.pdf
+*.backup
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# VS Code
+.vscode/
+
+# OS failid
+.DS_Store
+Thumbs.db
+
+# Virtualenv / venv
+venv/
+env/
+ENV/
+*.egg-info/
+
+# Jupyter / IPython
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Compiled files
+*.so
+*.dll
+*.exe
+
+# Test coverage
+htmlcov/
+.coverage
+.cache/
+
+# Dash build artifacts (if any)
+assets/__pycache__/
