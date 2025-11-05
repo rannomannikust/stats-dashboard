@@ -6,7 +6,7 @@ translations = {
         "envirstatus_header": "Keskkonnastastika valmimas",
         "indicator.label":"Indikaator",
         "ive_header":"Rahvastikustatistika valmimas",        
-        "salary.title": "Keskmine brutokuupal kaasta kaupa",        
+        "salary.title": "Keskmine brutokuupalk aasta kaupa",        
         "salary.label": "Brutokuupalk €",
         "salary_header": "Brutokuupalk – PA103",
         "salarychange":"Palga muutus (%)",        

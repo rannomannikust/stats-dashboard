@@ -33,3 +33,5 @@ python app.py
 4. 	Ava brauseris:
 
  http://localhost:8050
+
+ ![alt text](image.png)
