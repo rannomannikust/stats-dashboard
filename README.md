@@ -35,3 +35,6 @@ python app.py
  http://localhost:8050
 
  ![alt text](image.png)
+
+5. Töötav näidis:
+https://stats-dashboard-ev7j.onrender.com/
