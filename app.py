@@ -9,6 +9,11 @@ from layouts.population.ive import ive_layout
 
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
 app.title = "Stats Dashboard"
+
+# Renderi jaoks vajalik Flask serveri objekt
+server = app.server
+
+
 app.layout = html.Div([
     dcc.Location(id="url"),
     # Globaalne keel, salvestatakse brauseri localStorage'i
@@ -16,7 +21,6 @@ app.layout = html.Div([
     
      # Keelevalik dropdown
     html.Div([
-        #html.Label("Language / Keel:", style= # "Language / Keel:"
         html.Div(id="language-label",
                   style={
                     "marginRight": "10px",
@@ -87,4 +91,6 @@ def update_label(lang):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import os
+    port = int(os.environ.get("PORT", 10000))
+    app.run_server(host="0.0.0.0", port=port, debug=False)
