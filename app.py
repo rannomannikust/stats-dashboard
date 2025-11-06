@@ -92,5 +92,5 @@ def update_label(lang):
 
 if __name__ == "__main__":
     import os
-    port = int(os.environ.get("PORT", 10000))
-    app.run_server(host="0.0.0.0", port=port, debug=False)
+    port = int(os.environ.get("PORT", 8050))
+    app.run(host="0.0.0.0", port=port, debug=False)
