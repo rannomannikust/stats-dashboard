@@ -4,16 +4,20 @@ import pandas as pd
 import requests
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from services.fetch_data import get_salary_data
 from utils.helpers import apply_common_legend, get_meta_options
 from translation import translations   # ← import siit
 from dash import Input, Output, html, dcc
 import traceback
-
+import textwrap
 
 def get_pa103_data(indicator=None, emtak="TOTAL", years=None, lang="et"):
+
     # Fetch table metadata first so we can use the language-specific variable codes
     meta_url = f"https://andmed.stat.ee/api/v1/{lang}/stat/PA103"
     meta = requests.get(meta_url).json()
+
+    #print("metadata", meta)
     variables = [v["code"] for v in meta.get("variables", [])]
 
     # Build query using the variable codes from metadata (language-specific)
@@ -99,6 +103,7 @@ def get_pa103_data(indicator=None, emtak="TOTAL", years=None, lang="et"):
         ind_code = variables[0]
     else:
         ind_code = "Näitaja"
+
     indicator_map = {opt["value"]: opt["label"] for opt in opts.get(ind_code, [])}
     df["näitaja_nimi"] = df["näitaja"].map(indicator_map)
     df["väärtus"] = pd.to_numeric(df["väärtus"], errors="coerce")
@@ -113,8 +118,94 @@ def salary_layout(lang="et"):
     # Esialgne demo-graafik (TOTAL, GR_W_AVG, kõik aastad)
     df = get_pa103_data(indicator="GR_W_AVG", emtak="TOTAL", lang=lang)
 
+    opts = get_meta_options("PA103", lang)
+    #var_codes = list(opts.keys()
+
+    #võtame kõik emtak väärtused
+    emtak_values = [item["value"] for item in opts["Tegevusala"]]
+
+    #eemaldame "TOTAL"    
+    emtak_values = [v for v in emtak_values if v != "TOTAL"]
+    indicator_values = ["GR_W_AVG", "GR_W_D5"]    
+
+    latest_year = df["aasta"].max()
+
+    df2 = get_pa103_data(
+        indicator=indicator_values,
+        emtak=emtak_values,
+        years=latest_year,
+        lang=lang)
+
+    #print(df2)
+
     # Loo subplot kahe y-telje võimalusega
     fig = make_subplots(specs=[[{"secondary_y": True}]])
+    fig2 = make_subplots(specs=[[{"secondary_y": True}]])
+
+    # Võta kõige värskem aasta
+    latest_year = df2["aasta"].max()
+    df2_latest = df2[df2["aasta"] == latest_year]
+
+    # Sorteeri tegevusalad väärtuse järgi
+
+    # Aggregate duplicates (if any), then pivot so each tegevusala has avg/med columns
+    df2_agg = df2.groupby(["tegevusala", "näitaja"], as_index=False)["väärtus"].mean()
+
+    df2_wide = df2_agg.pivot(
+        index="tegevusala",
+        columns="näitaja",
+        values="väärtus"
+    ).reset_index()
+
+    # Determine which indicator columns exist (avg vs med) and drop activities with no values for both
+    indicator_cols = [c for c in ["GR_W_AVG", "GR_W_D5"] if c in df2_wide.columns]
+    if indicator_cols:
+        df2_wide = df2_wide.dropna(subset=indicator_cols, how="all")
+
+    # Ensure numeric types for sorting and place missing values last
+    for col in indicator_cols:
+        df2_wide[col] = pd.to_numeric(df2_wide[col], errors="coerce")
+
+    # Sort numerically by average (if available) and force NaNs to the end by filling them with +inf in the sort key
+    if "GR_W_AVG" in df2_wide.columns:
+        df2_wide_sorted = df2_wide.sort_values(
+            by="GR_W_AVG",
+            ascending=True,
+            key=lambda col: pd.to_numeric(col, errors="coerce").fillna(float("inf"))
+        )
+    else:
+        df2_wide_sorted = df2_wide
+
+    # Map activity codes to human-readable labels using metadata (if available)
+    activity_key = None
+    try:
+        # find which meta key contains the activity values
+        for k, vlist in opts.items():
+            values = {item.get("value") for item in vlist}
+            if any(code in values for code in df2_wide_sorted["tegevusala"]):
+                activity_key = k
+                break
+    except Exception:
+        activity_key = None
+
+    if activity_key:
+        activity_map = {item["value"]: item["label"] for item in opts.get(activity_key, [])}
+        # create a human-readable column and replace the kode values for plotting
+        df2_wide_sorted["tegevusala"] = df2_wide_sorted["tegevusala"].map(activity_map).fillna(df2_wide_sorted["tegevusala"])
+       # print("tegevusala", df2_wide_sorted["tegevusala"])
+       
+    # Wrap long activity names so they break into multiple lines in the chart.
+    def wrap_label(s, width=25):
+        try:
+            # textwrap.fill will break at word boundaries and insert '\n'
+            return textwrap.fill(str(s), width=width)
+        except Exception:
+            return s
+
+    # Add a wrapped label column and use it for plotting and ordering
+    df2_wide_sorted["tegevusala_wrapped"] = df2_wide_sorted["tegevusala"].apply(lambda s: wrap_label(s, width=25))
+    order = df2_wide_sorted["tegevusala_wrapped"].tolist()
+
 
     # Lisa keskmise palga tulbad vasakule teljele
     fig.add_trace(
@@ -128,10 +219,73 @@ def salary_layout(lang="et"):
         ),
         secondary_y=False
     )
+    # Build fig2 with explicit traces so ordering is deterministic
+    avg_name = translations[lang].get("salary.avg.label", "Keskmine palk")
+    med_name = translations[lang].get("salary.med.label", "Mediaan palk")
+
+    avg_trace = go.Bar(
+        y=df2_wide_sorted["tegevusala_wrapped"],
+        x=df2_wide_sorted.get("GR_W_AVG"),
+        name=avg_name,
+        orientation="h",
+        offsetgroup="1",
+        legendrank=1
+    )
+
+    med_trace = go.Bar(
+        y=df2_wide_sorted["tegevusala_wrapped"],
+        x=df2_wide_sorted.get("GR_W_D5"),
+        name=med_name,
+        orientation="h",
+        offsetgroup="2",
+        legendrank=2
+    )
+
+    # Force visual ordering by applying small horizontal offsets: avg left of med
+    # offsets are in plotly fraction units; adjust if needed for visual spacing
+    try:
+        # Use offsets so avg appears above/left of median depending on category ordering
+        avg_trace.update(offset=0.18)
+        med_trace.update(offset=-0.18)
+    except Exception:
+        # older plotly versions may not support offset; fallback to default order
+        pass
+
+    # Draw median first then average so average renders on top/foreground; legendrank keeps legend order
+    fig2 = go.Figure(data=[med_trace, avg_trace])
+    fig2.update_layout(barmode="group", legend=dict(traceorder="normal"), bargap=0.2)
+    
+    fig.update_layout(
+        barmode="group",
+        title=f"Keskmine vs Mediaan palk tegevusalade kaupa ({latest_year})",
+        xaxis_title="Palk (€)",
+        yaxis_title="Tegevusala"
+    )
+
+    # Adjust layout: reduce whitespace between plot and legend and give more
+    # vertical room to the bars. We set explicit margins and a taller height,
+    # and control legend placement afterwards.
+    fig2.update_layout(
+        barmode="group",
+        title=f"Keskmine vs Mediaan palk tegevusalade kaupa ({latest_year})",
+        xaxis_title="Palk (€)",
+        # remove yaxis_title as requested and restore larger height
+        height=2700,
+        margin=dict(l=120, r=40, t=100, b=90),
+        yaxis=dict(
+            categoryorder="array",     # ära lase tähestikulisel järjekorral üle kirjutada
+            categoryarray=order,
+            automargin=True,
+            tickfont=dict(size=12)
+        )
+    )
+
 
     # Telgede sätted
     fig.update_yaxes(title_text=translations[lang]["salary.label"], range=[0, None], secondary_y=False)
     fig.update_yaxes(title_text=translations[lang]["salarychange"], range=[0, None], secondary_y=True)
+
+    fig.update_yaxes(title_text=translations[lang]["salary.label"], range=[0, None], secondary_y=False)
 
     # Üldine layout
     fig.update_layout(
@@ -140,7 +294,8 @@ def salary_layout(lang="et"):
     )
 
     # Legend alla keskele
-    fig = apply_common_legend(fig, "h", -0.3, 0.5)
+    # the plotting area without too much extra whitespace.
+    fig2 = apply_common_legend(fig2, "h", -0.04, 0.5)
 
     return html.Div([
         html.H3(translations[lang]["salary_header"]),
@@ -158,7 +313,10 @@ def salary_layout(lang="et"):
             dcc.Dropdown(id="salary-year-dropdown")
         ], style={"width": "30%", "marginBottom": "10px"}),
 
-        dcc.Graph(id="salary-graph", figure=fig)
+        dcc.Graph(id="salary-graph", figure=fig),
+        dcc.Graph(id="salary-comparison", figure=fig2),
+            html.P("Keskmine palk võib olla mõjutatud väga kõrgetest väärtustest, "
+                "mediaan näitab tüüpilist töötajat.")        
     ])
 
 # Callbackid
@@ -178,6 +336,7 @@ def register_salary_callbacks(app):
     
     def update_salary_filters(pathname, lang):
         opts = get_meta_options("PA103", lang)
+
         # Determine language-specific variable codes from opts keys (order preserved)
         var_codes = list(opts.keys())
         ind_code = var_codes[0] if len(var_codes) > 0 else "Näitaja"
@@ -323,6 +482,47 @@ def register_salary_callbacks(app):
             err_fig = go.Figure()
             err_fig.update_layout(title=f"Error generating chart: {e}")
             return err_fig
+        
+    #@app.callback(
+    #    Output("salary-comparison", "figure"),
+     #   Input("language-dropdown", "value")
+    #)
+    def update_salary_comparison(lang):
+       
+        opts = get_meta_options("PA103", lang)
+        var_codes = list(opts.keys())
+        #print("codes",  var_codes)
+
+        emtak_code = var_codes[1]["values"]
+        #print("tegevusalad", emtak_code)
+        # Andmete päring (nt SQL või API)
+        
+        df2 = get_pa103_data(
+            indicator=["GR_W_AVG","GR_W_D5"],
+            emtak=None,
+            years=None,
+            lang=lang
+            )
+        
+        latest_year = df2["aasta"].max()
+        df2_latest = df2[df2["aasta"] == latest_year]
+
+        # Arvuta keskmine ja mediaan tegevusalade kaupa
+        grouped = df2.groupby("tegevusala")["palk"]
+        keskmised = grouped.mean()
+        mediaanid = grouped.median()
+
+        fig = go.Figure()
+        fig.add_bar(x=keskmised.index, y=keskmised.values, name="Keskmine palk")
+        fig.add_bar(x=mediaanid.index, y=mediaanid.values, name="Mediaan palk")
+
+        fig.update_layout(
+            barmode="group",
+            title=translations[lang]["salary.comparison.title"],
+            xaxis_title=translations[lang]["salary.comparison.xaxis"],
+            yaxis_title=translations[lang]["salary.comparison.yaxis"]
+        )
+        return fig
 
 
 
