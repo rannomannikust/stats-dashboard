@@ -233,7 +233,7 @@ def salary_layout(lang="et"):
         offsetgroup="1",
         legendrank=1
     )
-    print("235 wide sorted", df)
+    #print("235 wide sorted", df)
     med_trace = go.Bar(
         y=df2_wide_sorted["tegevusala_wrapped"],
         x=df2_wide_sorted.get("GR_W_D5"),
