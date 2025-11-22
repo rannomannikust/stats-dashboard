@@ -19,6 +19,8 @@ translations = {
         "sidebar.env":"Keskkond",
         "sidebar.pop":"Rahvastik",
         "sidebar.salary":"Brutokuupalk",
+        "sidebar.salary.longterm": "Aastapõhine vaade",
+        "sidebar.salary.shortterm": "Lühiajaline vaade",
         "sidebar.title": "Statistika",
         "year.label": "Aasta"
     },
@@ -42,6 +44,8 @@ translations = {
         "sidebar.env":"Enviroment",
         "sidebar.pop":"Population",
         "sidebar.salary":"Gross monthly salary",
+        "sidebar.salary.longterm": "Annual view",
+        "sidebar.salary.shortterm": "Short-term view",
         "sidebar.title": "Statistics",
         "year.label": "Year"
     }

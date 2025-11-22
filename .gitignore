@@ -1,5 +1,6 @@
 *.pdf
 *.backup
+*.env
 
 # Python cache
 __pycache__/
