@@ -1,0 +1,8 @@
+
+sservices:
+  stats-dashboard:
+    image: ghcr.io/<GITHUB_USER>/<REPO_NAME>:latest
+    container_name: stats-dashboard
+    restart: always
+    ports:
+      - "8050:8050"
