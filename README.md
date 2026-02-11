@@ -26,7 +26,7 @@ Iga push GitHubi main harusse käivitab CI/CD pipeline’i, mis:
 Traefik suunab liikluse domeenile:
 https://stats.mannikust.ee → stats-dashboard konteiner (port 8050)
 
-Arhitektuuri ülevaade
+#### Arhitektuuri ülevaade
  ![alt text](arhitektuur.png)
 
 
@@ -47,9 +47,10 @@ See tähendab, et deploy on täielikult automatiseeritud — muudatused jõuavad
 
 ## Arendamiseks lokaalselt
 1. Klooni repo:  
-   ```bash
+```bash
    git clone https://github.com/rannomannikust/stats-dashboard.git
    cd stats-dashboard
+```
 
 2. Paigalda sõltuvused:
 
@@ -71,5 +72,7 @@ python app.py
 
 ## Käivitamine Dockeriga (lokaalselt)
 
+```bash
 docker build -t stats-dashboard .
 docker run -p 8050:8050 --env-file .env stats-dashboard
+```
