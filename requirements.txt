@@ -3,4 +3,4 @@ plotly
 pandas
 requests
 gunicorn
-
+openai>=1.0.0
