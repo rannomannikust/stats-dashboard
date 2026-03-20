@@ -7,9 +7,16 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   
 
     steps:
+      - name: Debug SSH key
+        run: |
+          if [ -z "${{ secrets.VM_SSH_KEY }}" ]; then
+            echo "SSH KEY IS EMPTY"
+          else
+            echo "SSH KEY EXISTS"
+          fi
       - name: Checkout code
         uses: actions/checkout@v3
 
